@@ -171,8 +171,36 @@ html(
     #MainMenu, footer {{ visibility: hidden; }}
     [data-testid="stHeader"] {{ background: transparent !important; box-shadow: none !important; }}
     .stApp {{ background-color: {T['bg_main']}; transition: background-color 0.25s ease; }}
-    .main .block-container {{ padding-top: 0.6rem; padding-bottom: 150px; max-width: 780px; }}
     .tnum {{ font-variant-numeric: tabular-nums; }}
+
+    /* ── Chat layout: the thread scrolls in its own bounded pane, the
+       composer sits below it as a normal (non-floating) flex sibling.
+       This is what a real chat UI does — it's the only way for the
+       composer to be both always-visible AND never overlap content,
+       since raw `position: fixed` overlaps whatever the page has
+       scrolled to, regardless of where that is in the document. ──── */
+    [data-testid="stMain"] {{
+        height: 100vh !important; overflow: hidden !important;
+        display: flex !important; flex-direction: column !important;
+    }}
+    [data-testid="stMainBlockContainer"],
+    [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {{
+        display: flex !important; flex-direction: column !important;
+        height: 100% !important; overflow: hidden !important;
+        padding-top: 0.6rem !important; padding-bottom: 0.6rem !important;
+        max-width: none !important;
+    }}
+    /* st.container(key=...) wraps its content in an intermediate
+       stLayoutWrapper div — THAT is the actual flex item (a direct
+       child of the block above), one level up from .st-key-*, so the
+       flex-sizing rules have to target the wrapper via :has(), not the
+       named class itself. */
+    [data-testid="stLayoutWrapper"]:has(.st-key-thread_scroll) {{
+        flex: 1 1 auto !important; min-height: 0 !important; overflow: hidden !important;
+    }}
+    [data-testid="stLayoutWrapper"]:has(.st-key-composer) {{ flex-shrink: 0 !important; }}
+    .st-key-thread_scroll {{ height: 100% !important; overflow-y: auto !important; }}
+    .st-key-thread_scroll > div {{ max-width: 780px; margin: 0 auto; padding: 0 1.5rem; }}
 
     .material-icons, .material-icons-round, .material-icons-outlined,
     .material-symbols-rounded, .material-symbols-outlined, [data-testid="stIconMaterial"] {{
@@ -348,19 +376,16 @@ html(
         border-radius: 6px; padding: 3px 8px; margin-bottom: 10px;
     }}
 
-    /* ── Composer (fixed to the bottom of the main content column) ───
-       [data-testid="stMain"] gets a no-op transform below, which makes it
-       establish its own containing block for `position: fixed` descendants
-       (per the CSS spec) — so the composer's fixed positioning resolves
-       against stMain's actual box (already correctly sized to exclude the
-       sidebar) instead of the full viewport. This is what keeps it both
-       centered under the sidebar's current state AND always visible,
-       instead of choosing one or the other. ─────────────────────────── */
-    [data-testid="stMain"] {{ transform: translateZ(0); }}
+    /* ── Composer: a normal (non-floating) flex item docked below the
+       scrolling thread pane — see [data-testid="stMain"] above. Because
+       it's laid out in-flow rather than `position: fixed`, it can never
+       overlap thread content while scrolling, and it's automatically
+       full-width-of-stMain (already correctly excluding the sidebar), so
+       centering the inner pill needs nothing more than margin: auto. ── */
     .st-key-composer {{
-        position: fixed !important; bottom: 0; left: 0; right: 0;
-        background: linear-gradient(to top, {T['bg_main']} 55%, transparent);
-        padding: 18px 0 22px 0 !important; z-index: 999;
+        flex-shrink: 0 !important;
+        background: {T['bg_main']};
+        padding: 10px 0 4px 0 !important;
     }}
     .st-key-composer > div {{ max-width: 780px; margin: 0 auto; padding: 0 1.5rem; }}
     [data-testid="stForm"] {{
@@ -420,7 +445,7 @@ html(
     .gauge-wrap svg {{ max-width: 100%; height: auto; }}
 
     @media (max-width: 640px) {{
-        .main .block-container {{ padding-left: 0.85rem !important; padding-right: 0.85rem !important; padding-bottom: 320px !important; }}
+        .st-key-thread_scroll > div {{ padding: 0 0.85rem; }}
         .hero {{ padding: 6vh 8px 16px 8px; }}
         .hero-icon {{ width: 44px; height: 44px; border-radius: 13px; margin-bottom: 12px; }}
         .hero-title {{ font-size: 21px; }}
@@ -431,10 +456,13 @@ html(
         .confidence-strip, .info-card {{ max-width: 100%; }}
         .gauge-ticks {{ width: 100%; max-width: 220px; }}
 
-        /* Fixed composer: force the 6 inline fields into a 3-column grid
-           instead of Streamlit's default full vertical stack, so it does
-           not grow tall enough to cover the page content above it. */
-        .st-key-composer {{ padding: 12px 0 14px 0 !important; }}
+        /* The composer already can't overlap content (it's a normal flex
+           sibling below the scrolling thread pane, not floated over it) —
+           this just keeps it compact on a narrow screen: the 6 inline
+           fields wrap into a grid instead of Streamlit's default full
+           vertical stack, which would otherwise eat most of the viewport
+           height and leave little room for the thread pane above it. */
+        .st-key-composer {{ padding: 8px 0 4px 0 !important; }}
         .st-key-composer > div {{ padding: 0 0.6rem; }}
         [data-testid="stForm"] {{ padding: 10px 12px !important; border-radius: 18px !important; }}
         [data-testid="stForm"] [data-testid="stHorizontalBlock"] {{
@@ -602,65 +630,69 @@ with st.sidebar:
         html('<div class="sb-empty">Your predictions this session will appear here.</div>')
 
 # ─────────────────────────────────────────────────────────────────────────────
-# MAIN: THREAD
+# MAIN: THREAD (scrolls in its own bounded pane — see the flex-column layout
+# in the CSS above, which is what keeps this from ever sliding underneath
+# the composer the way a page-level `position: fixed` bar would)
 # ─────────────────────────────────────────────────────────────────────────────
 
-if not st.session_state["history"]:
-    html(
-        f"""
-        <div class="hero">
-        <div class="hero-icon">{icon('bed', size=26, stroke='white')}</div>
-        <div class="hero-title">Hospital Bed Occupancy Predictor</div>
-        <div class="hero-sub">Enter a shift's operational data below to forecast bed occupancy with a
-        Random Forest model trained on {DATA_FILENAME}, sourced from Gaggle.</div>
-        </div>
-        """
-    )
-else:
-    for i, turn in enumerate(st.session_state["history"], start=1):
+with st.container(key="thread_scroll"):
+    if not st.session_state["history"]:
         html(
-            f'<div class="turn" id="turn-{i}">'
-            f'<div class="user-row"><div class="user-bubble">{user_summary(turn["inputs"])}</div></div>'
-            f'{render_assistant_result(turn["prediction"])}'
-            f'</div>'
+            f"""
+            <div class="hero">
+            <div class="hero-icon">{icon('bed', size=26, stroke='white')}</div>
+            <div class="hero-title">Hospital Bed Occupancy Predictor</div>
+            <div class="hero-sub">Enter a shift's operational data below to forecast bed occupancy with a
+            Random Forest model trained on {DATA_FILENAME} — a generated dataset, not real recorded
+            hospital data.</div>
+            </div>
+            """
+        )
+    else:
+        for i, turn in enumerate(st.session_state["history"], start=1):
+            html(
+                f'<div class="turn" id="turn-{i}">'
+                f'<div class="user-row"><div class="user-bubble">{user_summary(turn["inputs"])}</div></div>'
+                f'{render_assistant_result(turn["prediction"])}'
+                f'</div>'
+            )
+
+    if st.session_state["pending"] is not None:
+        html(
+            f"""
+            <div class="turn">
+            <div class="user-row"><div class="user-bubble">{user_summary(st.session_state["pending"])}</div></div>
+            <div class="assistant-row">
+            <div class="assistant-avatar">{icon('bed', size=15, stroke='white')}</div>
+            <div class="assistant-body">
+            <div class="thinking-dots"><span></span><span></span><span></span></div>
+            </div>
+            </div>
+            </div>
+            """
         )
 
-if st.session_state["pending"] is not None:
-    html(
-        f"""
-        <div class="turn">
-        <div class="user-row"><div class="user-bubble">{user_summary(st.session_state["pending"])}</div></div>
-        <div class="assistant-row">
-        <div class="assistant-avatar">{icon('bed', size=15, stroke='white')}</div>
-        <div class="assistant-body">
-        <div class="thinking-dots"><span></span><span></span><span></span></div>
-        </div>
-        </div>
-        </div>
-        """
-    )
-
-    pending = st.session_state["pending"]
-    net_flow = pending["admissions"] - pending["discharges"]
-    row = pd.DataFrame(
-        [
-            {
-                "admissions": pending["admissions"],
-                "discharges": pending["discharges"],
-                "staff_count": pending["staff_count"],
-                "Month": pending["date"].month,
-                "Day": pending["date"].day,
-                "DayOfWeek": pending["date"].weekday(),
-                "Hour": pending["time"].hour,
-                "net_flow": net_flow,
-            }
-        ]
-    )[PREDICTOR_COLUMNS]
-    time_module.sleep(0.55)
-    prediction = float(model.predict(row)[0])
-    st.session_state["history"].append({"inputs": pending, "prediction": prediction})
-    st.session_state["pending"] = None
-    st.rerun()
+        pending = st.session_state["pending"]
+        net_flow = pending["admissions"] - pending["discharges"]
+        row = pd.DataFrame(
+            [
+                {
+                    "admissions": pending["admissions"],
+                    "discharges": pending["discharges"],
+                    "staff_count": pending["staff_count"],
+                    "Month": pending["date"].month,
+                    "Day": pending["date"].day,
+                    "DayOfWeek": pending["date"].weekday(),
+                    "Hour": pending["time"].hour,
+                    "net_flow": net_flow,
+                }
+            ]
+        )[PREDICTOR_COLUMNS]
+        time_module.sleep(0.55)
+        prediction = float(model.predict(row)[0])
+        st.session_state["history"].append({"inputs": pending, "prediction": prediction})
+        st.session_state["pending"] = None
+        st.rerun()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # COMPOSER (fixed bottom)
