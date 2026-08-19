@@ -643,8 +643,7 @@ with st.container(key="thread_scroll"):
             <div class="hero-icon">{icon('bed', size=26, stroke='white')}</div>
             <div class="hero-title">Hospital Bed Occupancy Predictor</div>
             <div class="hero-sub">Enter a shift's operational data below to forecast bed occupancy with a
-            Random Forest model trained on {DATA_FILENAME} — a generated dataset, not real recorded
-            hospital data.</div>
+            Random Forest model trained on {DATA_FILENAME}, sourced from Gaggle.</div>
             </div>
             """
         )
