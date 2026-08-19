@@ -25,13 +25,14 @@ from datetime import datetime, date, time
 import numpy as np
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_PATH = os.path.join(BASE_DIR, "ANDREW_DATASET_V2.csv")
-DATA_FILENAME = "ANDREW_DATASET.csv"
+DATA_FILENAME = "ANDREW_DATASET_V2.csv"
 
 NORMAL_MAX = 71.2
 ELEVATED_MAX = 81.0
@@ -601,6 +602,41 @@ def user_summary(inputs):
     )
 
 
+def scroll_thread_to_bottom():
+    """Push the newest turn into view, the way a chat app does when a
+    message arrives — the thread pane scrolls so older turns move up
+    and out of the way. Runs via a 0-height components.html iframe
+    since st.markdown strips <script> tags; the iframe's script can
+    still reach the real page through window.parent (same origin).
+
+    Streamlit dedupes a component by its rendered content: identical
+    HTML across reruns means the iframe is never remounted, so the
+    <script> inside it never re-executes past the very first call.
+    A nonce (turn count + wall-clock time) makes every call's payload
+    unique so a fresh mount — and a fresh script run — actually happens
+    each time a new turn arrives.
+    """
+    nonce = f"{len(st.session_state['history'])}-{time_module.time()}"
+    components.html(
+        f"""<script>
+        // Streamlit patches the parent DOM asynchronously — this
+        // component's own script can run before that patch lands, so
+        // scrollHeight would still reflect the pre-update content. A
+        // short delay (plus a second call as a safety net) lets the
+        // new turn actually be in the DOM before measuring it.
+        // nonce: {nonce}
+        function scrollNow() {{
+            const doc = window.parent.document;
+            const el = doc.querySelector('.st-key-thread_scroll');
+            if (el) {{ el.scrollTop = el.scrollHeight; }}
+        }}
+        setTimeout(scrollNow, 150);
+        setTimeout(scrollNow, 500);
+        </script>""",
+        height=0,
+    )
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # SIDEBAR
 # ─────────────────────────────────────────────────────────────────────────────
@@ -643,7 +679,8 @@ with st.container(key="thread_scroll"):
             <div class="hero-icon">{icon('bed', size=26, stroke='white')}</div>
             <div class="hero-title">Hospital Bed Occupancy Predictor</div>
             <div class="hero-sub">Enter a shift's operational data below to forecast bed occupancy with a
-            Random Forest model trained on {DATA_FILENAME}, sourced from Gaggle.</div>
+            Random Forest model trained on {DATA_FILENAME} — a generated dataset, not real recorded
+            hospital data.</div>
             </div>
             """
         )
@@ -692,6 +729,14 @@ with st.container(key="thread_scroll"):
         st.session_state["history"].append({"inputs": pending, "prediction": prediction})
         st.session_state["pending"] = None
         st.rerun()
+
+# Push the latest turn into view — runs on every render of the thread
+# (the "thinking" bubble appearing, then the real result replacing it),
+# so older turns move up out of the way the way a chat app does. Safe
+# to run unconditionally: the only reruns in this app are triggered by
+# the form or the sidebar buttons, never by the reader's own scrolling,
+# so there's no scenario where this fights a deliberate scroll-up.
+scroll_thread_to_bottom()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # COMPOSER (fixed bottom)
