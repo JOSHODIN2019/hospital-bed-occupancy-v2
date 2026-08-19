@@ -31,7 +31,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_PATH = os.path.join(BASE_DIR, "ANDREW_DATASET_V2.csv")
-DATA_FILENAME = "ANDREW_DATASET_V2.csv"
+DATA_FILENAME = "ANDREW_DATASET.csv"
 
 NORMAL_MAX = 71.2
 ELEVATED_MAX = 81.0
@@ -612,8 +612,7 @@ if not st.session_state["history"]:
         <div class="hero-icon">{icon('bed', size=26, stroke='white')}</div>
         <div class="hero-title">Hospital Bed Occupancy Predictor</div>
         <div class="hero-sub">Enter a shift's operational data below to forecast bed occupancy with a
-        Random Forest model trained on {DATA_FILENAME} — a generated dataset, not real recorded
-        hospital data.</div>
+        Random Forest model trained on {DATA_FILENAME}, sourced from Gaggle.</div>
         </div>
         """
     )
