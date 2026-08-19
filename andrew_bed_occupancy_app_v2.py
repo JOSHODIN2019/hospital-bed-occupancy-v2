@@ -31,7 +31,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_PATH = os.path.join(BASE_DIR, "ANDREW_DATASET_V2.csv")
-DATA_FILENAME = "ANDREW_DATASET.csv"
+DATA_FILENAME = "ANDREW_DATASET_V2.csv"
 
 NORMAL_MAX = 71.2
 ELEVATED_MAX = 81.0
@@ -171,7 +171,7 @@ html(
     #MainMenu, footer {{ visibility: hidden; }}
     [data-testid="stHeader"] {{ background: transparent !important; box-shadow: none !important; }}
     .stApp {{ background-color: {T['bg_main']}; transition: background-color 0.25s ease; }}
-    .main .block-container {{ padding-top: 0.6rem; padding-bottom: 160px; max-width: 780px; }}
+    .main .block-container {{ padding-top: 0.6rem; padding-bottom: 150px; max-width: 780px; }}
     .tnum {{ font-variant-numeric: tabular-nums; }}
 
     .material-icons, .material-icons-round, .material-icons-outlined,
@@ -187,6 +187,38 @@ html(
     }}
     [data-testid="stSidebar"] * {{ color: {T['text_primary']}; }}
     [data-testid="stSidebarHeader"] {{ padding: 10px 12px !important; }}
+
+    /* ── Sidebar open/close toggle (custom hamburger — Material icon font is
+       suppressed above, so both the collapse and expand buttons need their
+       own CSS-drawn icon) ────────────────────────────────────────────── */
+    [data-testid="stSidebarCollapseButton"] button,
+    [data-testid="stExpandSidebarButton"] {{
+        width: 32px !important; height: 32px !important;
+        display: flex !important; align-items: center !important; justify-content: center !important;
+        border-radius: 8px !important; border: none !important; cursor: pointer !important;
+        position: relative !important; padding: 0 !important;
+        transition: background 0.15s ease !important;
+    }}
+    [data-testid="stSidebarCollapseButton"] button {{
+        background: transparent !important; color: {T['text_secondary']} !important;
+    }}
+    [data-testid="stSidebarCollapseButton"] button:hover {{ background: {T['hover']} !important; }}
+    [data-testid="stExpandSidebarButton"] {{
+        background: {T['bg_secondary']} !important; border: 1px solid {T['border']} !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.25) !important;
+    }}
+    [data-testid="stExpandSidebarButton"]:hover {{ background: {T['hover']} !important; }}
+    [data-testid="stSidebarCollapseButton"] svg,
+    [data-testid="stExpandSidebarButton"] svg,
+    [data-testid="stSidebarCollapseButton"] [data-testid="stIconMaterial"],
+    [data-testid="stExpandSidebarButton"] [data-testid="stIconMaterial"] {{ display: none !important; }}
+    [data-testid="stSidebarCollapseButton"] button::before,
+    [data-testid="stExpandSidebarButton"]::before {{
+        content: ""; position: absolute; width: 16px; height: 2px; border-radius: 2px;
+        background: currentColor; top: calc(50% - 6px); left: calc(50% - 8px);
+        box-shadow: 0 5px 0 currentColor, 0 10px 0 currentColor;
+    }}
+    [data-testid="stExpandSidebarButton"]::before {{ color: {T['text_primary']}; }}
 
     .sb-new-btn {{
         display: flex; align-items: center; gap: 9px;
@@ -316,7 +348,15 @@ html(
         border-radius: 6px; padding: 3px 8px; margin-bottom: 10px;
     }}
 
-    /* ── Composer (fixed bottom) ──────────────────────────────────── */
+    /* ── Composer (fixed to the bottom of the main content column) ───
+       [data-testid="stMain"] gets a no-op transform below, which makes it
+       establish its own containing block for `position: fixed` descendants
+       (per the CSS spec) — so the composer's fixed positioning resolves
+       against stMain's actual box (already correctly sized to exclude the
+       sidebar) instead of the full viewport. This is what keeps it both
+       centered under the sidebar's current state AND always visible,
+       instead of choosing one or the other. ─────────────────────────── */
+    [data-testid="stMain"] {{ transform: translateZ(0); }}
     .st-key-composer {{
         position: fixed !important; bottom: 0; left: 0; right: 0;
         background: linear-gradient(to top, {T['bg_main']} 55%, transparent);
@@ -374,6 +414,46 @@ html(
         transition: background 0.15s ease !important;
     }}
     .st-key-topbar .stButton > button:hover {{ background: {T['hover']} !important; }}
+
+    /* ── Responsive (mobile) ───────────────────────────────────────── */
+    html, body {{ overflow-x: hidden !important; }}
+    .gauge-wrap svg {{ max-width: 100%; height: auto; }}
+
+    @media (max-width: 640px) {{
+        .main .block-container {{ padding-left: 0.85rem !important; padding-right: 0.85rem !important; padding-bottom: 320px !important; }}
+        .hero {{ padding: 6vh 8px 16px 8px; }}
+        .hero-icon {{ width: 44px; height: 44px; border-radius: 13px; margin-bottom: 12px; }}
+        .hero-title {{ font-size: 21px; }}
+        .hero-sub {{ font-size: 13px; max-width: 320px; }}
+
+        .user-bubble {{ max-width: 88%; font-size: 13.5px; }}
+        .assistant-avatar {{ width: 26px; height: 26px; }}
+        .confidence-strip, .info-card {{ max-width: 100%; }}
+        .gauge-ticks {{ width: 100%; max-width: 220px; }}
+
+        /* Fixed composer: force the 6 inline fields into a 3-column grid
+           instead of Streamlit's default full vertical stack, so it does
+           not grow tall enough to cover the page content above it. */
+        .st-key-composer {{ padding: 12px 0 14px 0 !important; }}
+        .st-key-composer > div {{ padding: 0 0.6rem; }}
+        [data-testid="stForm"] {{ padding: 10px 12px !important; border-radius: 18px !important; }}
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] {{
+            flex-wrap: wrap !important; gap: 8px !important;
+        }}
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {{
+            flex: 1 1 28% !important; width: auto !important; min-width: 82px !important;
+        }}
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(4),
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(5) {{
+            flex-basis: 42% !important;
+        }}
+        [data-testid="stForm"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(6) {{
+            flex: 0 0 40px !important; min-width: 40px !important;
+            display: flex !important; align-items: flex-end !important;
+        }}
+        .stNumberInput label, .stDateInput label, .stTimeInput label {{ font-size: 9px !important; }}
+        .stNumberInput input, .stDateInput input, .stTimeInput input {{ font-size: 12.5px !important; }}
+    }}
 
     </style>
     """
@@ -532,7 +612,8 @@ if not st.session_state["history"]:
         <div class="hero-icon">{icon('bed', size=26, stroke='white')}</div>
         <div class="hero-title">Hospital Bed Occupancy Predictor</div>
         <div class="hero-sub">Enter a shift's operational data below to forecast bed occupancy with a
-        Random Forest model trained on {DATA_FILENAME} sourced from Gaggle</div>
+        Random Forest model trained on {DATA_FILENAME} — a generated dataset, not real recorded
+        hospital data.</div>
         </div>
         """
     )
